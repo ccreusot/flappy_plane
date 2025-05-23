@@ -1,7 +1,7 @@
 import pygame
 import xml.etree.ElementTree as ET
 import random
-
+import ia
 
 def load_sprites_sheet(file_name):
     sprites_atlas = file_name + ".xml"
@@ -50,8 +50,13 @@ class Player:
         self.upward_vector = pygame.Vector2(0, 0)
         self.current_frame = 0
         self.rotation = 0  # Player rotation in degrees
+        self.canPlay = True
+        self.score = 0
 
     def update(self, dt):
+        if not self.canPlay:
+            return
+        self.score+=1
         # Update player position
         if self.upward_vector.y < 0:
             self.position += self.upward_vector * dt  # Apply the upward vector to the player position
@@ -69,6 +74,8 @@ class Player:
         self.current_frame = (self.current_frame + 10 * dt) % len(self.sprites)
 
     def draw(self, screen):
+        if not self.canPlay:
+            return
         # Get the original sprite
         original_sprite = self.sprites[floor(self.current_frame)]
         
@@ -116,7 +123,9 @@ class Player:
         # pygame.draw.rect(screen, (255, 0, 0), obstacle_rect)
 
         # Check for collision
-        return player_rect.colliderect(obstacle_rect) or player_rect.colliderect(pygame.Rect(0, screen.get_height() - 50, screen.get_width(), screen.get_height()))
+        return player_rect.colliderect(obstacle_rect)\
+        or self.position.y < 0\
+        or self.position.y > screen.get_height() - 100
 
 class Obstacle:
     def __init__(self, sprite, position):
@@ -159,50 +168,74 @@ score = 0
 
 background = ScrollingImage(sheet["background.png"], 100, pygame.Vector2(0, 0), scale_factor)
 ground = ScrollingImage(sheet["groundDirt.png"], 60, pygame.Vector2(0, screen.get_height() - sheet["groundDirt.png"].get_height()))
-player = Player([planes["planeBlue1.png"], planes["planeBlue2.png"], planes["planeBlue3.png"]], pygame.Vector2(screen.get_width() / 2 - planes["planeBlue1.png"].get_width() / 2, screen.get_height() / 2 - planes["planeBlue1.png"].get_height() / 2))
+# player = Player([planes["planeBlue1.png"], planes["planeBlue2.png"], planes["planeBlue3.png"]], pygame.Vector2(screen.get_width() / 2 - planes["planeBlue1.png"].get_width() / 2, screen.get_height() / 2 - planes["planeBlue1.png"].get_height() / 2))
 obstacles = [
     Obstacle(sheet["rock.png"], pygame.Vector2(screen.get_width() + sheet["rock.png"].get_width(), screen.get_height() - sheet["rock.png"].get_height())),
     Obstacle(sheet["rockDown.png"], pygame.Vector2(screen.get_width() + sheet["rockDown.png"].get_width(), 0))
     ]
 
+# idk, some name
+learner_count = 1000
+
+def generate_player():
+    return Player([planes["planeBlue1.png"], planes["planeBlue2.png"], planes["planeBlue3.png"]], pygame.Vector2(screen.get_width() / 2 - planes["planeBlue1.png"].get_width() / 2, screen.get_height() / 2 - planes["planeBlue1.png"].get_height() / 2))    
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                if not playable:
-                    playable = True
-                player.move_up()
+
+    if not playable:
+        # generate AIs & learn
+        ai_array = [ia.IA(i) for i in range(learner_count)]
+        # give each AI a player
+        player_arr = [generate_player() for _ in range(learner_count)]
+        # reset game state
+        playable = True
 
     if playable:
+        # AI decision
+
+        for i, bot in enumerate(ai_array):
+            linked_player = player_arr[i]
+            pipe_distance = obstacles[0].position.distance_to(linked_player.position)
+            if bot.should_flap(linked_player.position.y, pipe_distance):
+                linked_player.move_up()
+
         background.update(dt)
         ground.update(dt)
-        player.update(dt)
+        for player in player_arr:
+            player.update(dt)
+
         for obstacle in obstacles:
             obstacle.update(dt)
-            if player.collide(obstacle):
-                playable = False
-                player = Player([planes["planeBlue1.png"], planes["planeBlue2.png"], planes["planeBlue3.png"]], pygame.Vector2(screen.get_width() / 2 - planes["planeBlue1.png"].get_width() / 2, screen.get_height() / 2 - planes["planeBlue1.png"].get_height() / 2))
-                obstacles = [
-                    Obstacle(sheet["rock.png"], pygame.Vector2(screen.get_width() + sheet["rock.png"].get_width(), screen.get_height() - sheet["rock.png"].get_height())),
-                    Obstacle(sheet["rockDown.png"], pygame.Vector2(screen.get_width() + sheet["rockDown.png"].get_width(), 0))
-                    ]
-                
+            for i, player in enumerate(player_arr):
+                if player.collide(obstacle):
+                    player.canPlay = False
+                    print(f"Player({i}): {player.score}")
+
+        if all(not player.canPlay for player in player_arr):
+            playable = False
+            obstacles = [
+                Obstacle(sheet["rock.png"], pygame.Vector2(screen.get_width() + sheet["rock.png"].get_width(), screen.get_height() - sheet["rock.png"].get_height())),
+                Obstacle(sheet["rockDown.png"], pygame.Vector2(screen.get_width() + sheet["rockDown.png"].get_width(), 0))
+            ]
+            continue
+
         # Update score
-        if not score_updated and player.position.x > obstacles[0].position.x + obstacles[0].sprite.get_width() // 2:
-            score += 1
-            score_updated = True
+        # if not score_updated and player.position.x > obstacles[0].position.x + obstacles[0].sprite.get_width() // 2:
+        #     score += 1
+        #     score_updated = True        
 
     screen.fill("purple")
 
     # background full screen
     background.draw(screen)
     ground.draw(screen)
-    player.draw(screen)
+    for player in player_arr:
+        player.draw(screen)
     for obstacle in obstacles:
         obstacle.draw(screen)
-        # player.collide(obstacle)
 
     # Display score centered on top of the screen
     score_text = pygame.font.SysFont("Arial", 42).render(f"{score}", True, (0, 0, 0))
