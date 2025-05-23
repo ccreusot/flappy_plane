@@ -175,7 +175,7 @@ obstacles = [
     ]
 
 # idk, some name
-learner_count = 1000
+learner_count = 10
 
 def generate_player():
     return Player([planes["planeBlue1.png"], planes["planeBlue2.png"], planes["planeBlue3.png"]], pygame.Vector2(screen.get_width() / 2 - planes["planeBlue1.png"].get_width() / 2, screen.get_height() / 2 - planes["planeBlue1.png"].get_height() / 2))    
@@ -198,7 +198,8 @@ while running:
 
         for i, bot in enumerate(ai_array):
             linked_player = player_arr[i]
-            pipe_distance = obstacles[0].position.distance_to(linked_player.position)
+            pipe_hole = pygame.Vector2(obstacles[0].position.x, obstacles[0].position.y + obstacles[0].sprite.get_height())
+            pipe_distance = linked_player.position.distance_to(pipe_hole)
             if bot.should_flap(linked_player.position.y, pipe_distance):
                 linked_player.move_up()
 
@@ -212,7 +213,7 @@ while running:
             for i, player in enumerate(player_arr):
                 if player.collide(obstacle):
                     player.canPlay = False
-                    print(f"Player({i}): {player.score}")
+                    #print(f"Player({i}): {player.score}")
 
         if all(not player.canPlay for player in player_arr):
             playable = False
