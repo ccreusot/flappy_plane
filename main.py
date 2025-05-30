@@ -2,6 +2,9 @@ import pygame
 import xml.etree.ElementTree as ET
 import random
 import ia
+from scrollingimage import ScrollingImage
+from obstacle import Obstacle
+from player import Player
 
 def load_sprites_sheet(file_name):
     sprites_atlas = file_name + ".xml"
@@ -23,134 +26,6 @@ def load_sprites_sheet(file_name):
         sprite_image.blit(sprites_sheet_image, (0, 0), sprite_rect)
         sprites[sprite_name] = sprite_image
     return sprites
-
-def floor(value):
-    return int(value)
-
-class ScrollingImage:
-    def __init__(self, image, scroll_speed, position, scale_factor = 1.0):
-        self.position = position
-        self.scroll_speed = scroll_speed
-        self.scale_factor = scale_factor
-        self.background = pygame.transform.scale(image, (image.get_width() * scale_factor, image.get_height() * scale_factor))
-
-    def update(self, dt):
-        self.position.x -= self.scroll_speed * dt
-        if self.position.x < -self.background.get_width():
-            self.position.x = 0  # Reset the background to the right side of the screen when it reaches the left side
-
-    def draw(self, screen):
-        screen.blit(self.background, (self.position.x, self.position.y))
-        screen.blit(self.background, (self.position.x + self.background.get_width(), self.position.y))
-
-class Player:
-    def __init__(self, sprites, position):
-        self.sprites = sprites
-        self.position = position
-        self.upward_vector = pygame.Vector2(0, 0)
-        self.current_frame = 0
-        self.rotation = 0  # Player rotation in degrees
-        self.canPlay = True
-        self.score = 0
-
-    def update(self, dt):
-        if not self.canPlay:
-            return
-        self.score+=1
-        # Update player position
-        if self.upward_vector.y < 0:
-            self.position += self.upward_vector * dt  # Apply the upward vector to the player position
-            self.upward_vector.y += 500 * dt  # Apply gravity to the player position when going upwards
-            if self.rotation < 35:
-                self.rotation += 70 * dt
-        else: # Get the original sprite
-            self.position.y += 200 * dt  # Move the player down the screen
-            # Update player rotation
-            if self.rotation > -35:
-                self.rotation -= 100 * dt  # Rotate the player by 5 degrees per second
-
-
-        # Last operation updating the player frame position
-        self.current_frame = (self.current_frame + 10 * dt) % len(self.sprites)
-
-    def draw(self, screen):
-        if not self.canPlay:
-            return
-        # Get the original sprite
-        original_sprite = self.sprites[floor(self.current_frame)]
-        
-        # Rotate the sprite around its center
-        rotated_sprite = pygame.transform.rotate(original_sprite, self.rotation)
-        
-        # Get the rect of the rotated sprite
-        rotated_rect = rotated_sprite.get_rect()
-        
-        # Set the center of the rotated rect to the center of the original position
-        original_center = (self.position.x + original_sprite.get_width() // 2, 
-                        self.position.y + original_sprite.get_height() // 2)
-        rotated_rect.center = original_center
-        
-        # Draw the rotated sprite
-        screen.blit(rotated_sprite, rotated_rect)
-
-    def move_up(self):
-        self.upward_vector.y = -250  # Move the player upwards
-
-    def collide(self, obstacle):
-        # Check if the player and the obstacle collide
-        # Create a rect for the player (using the center point for better collision)
-        original_sprite = self.sprites[floor(self.current_frame)]
-        player_center = (self.position.x + original_sprite.get_width() // 2, 
-                        self.position.y + original_sprite.get_height() // 2)
-        
-        # Create a smaller collision circle for the player (using a rect as approximation)
-        collision_radius = min(original_sprite.get_width(), original_sprite.get_height()) // 3
-        player_rect = pygame.Rect(
-            player_center[0] - collision_radius,
-            player_center[1] - collision_radius,
-            collision_radius * 2,
-            collision_radius * 2
-        )
-        
-        # Create a rect for the obstacle
-        obstacle_rect = pygame.Rect(
-            obstacle.position.x + obstacle.sprite.get_width() / 2, 
-            obstacle.position.y, 
-            obstacle.sprite.get_width() / 4, 
-            obstacle.sprite.get_height()
-        )
-
-        # pygame.draw.rect(screen, (255, 0, 0), obstacle_rect)
-
-        # Check for collision
-        return player_rect.colliderect(obstacle_rect)\
-        or self.position.y < 0\
-        or self.position.y > screen.get_height() - 100
-
-class Obstacle:
-    def __init__(self, sprite, position):
-        self.sprite = sprite
-        self.position = position
-        self.y_default = position.y # Store the default y position
-
-    def update(self, dt):
-        self.position.x -= 100 * dt  # Move the obstacle to the left
-        if self.position.x < -self.sprite.get_width():
-            self.position.x = screen.get_width()  # Reset the obstacle to the right side of the screen when it reaches the left side
-            # Randomize the Obstacle y position
-            # Make sure the obstacle is not too close to the player
-            if self.y_default <= 0:
-                start = int(min(self.y_default, self.y_default - self.sprite.get_height() // 3))
-                stop = int(max(self.y_default, self.y_default - self.sprite.get_height() // 3))
-            else:
-                start = int(min(self.y_default, self.y_default + self.sprite.get_height() // 3))
-                stop = int(max(self.y_default, self.y_default + self.sprite.get_height() // 3))
-            self.position.y = random.randint(start, stop)
-            global score_updated
-            score_updated = False
-
-    def draw(self, screen):
-        screen.blit(self.sprite, self.position)
 
 pygame.init()
 pygame.font.init()
@@ -175,7 +50,15 @@ obstacles = [
     ]
 
 # idk, some name
-learner_count = 10
+learner_count = 100
+
+# cohorte_count
+# cohorte_size
+# update_pct_range
+
+ai_array = []
+player_arr = []
+
 
 def generate_player():
     return Player([planes["planeBlue1.png"], planes["planeBlue2.png"], planes["planeBlue3.png"]], pygame.Vector2(screen.get_width() / 2 - planes["planeBlue1.png"].get_width() / 2, screen.get_height() / 2 - planes["planeBlue1.png"].get_height() / 2))    
@@ -186,11 +69,29 @@ while running:
             running = False
 
     if not playable:
-        # generate AIs & learn
-        ai_array = [ia.IA(i) for i in range(learner_count)]
+        if len(player_arr) > 0 and all(not player.canPlay for player in player_arr):
+            ai_array.sort(key=lambda ai: player_arr[ai.id].score, reverse=True)
+            new_ai_array = []
+            ai_count = 0
+            for ai in ai_array[:10]:
+                ai.id = ai_count
+                new_ai_array.append(ai)
+                ai_count += 1
+                for i in range(9):
+                    new_ai = ia.IA.from_ia(ai)
+                    new_ai.id = ai_count
+                    new_ai_array.append(new_ai)
+                    ai_count += 1
+            ai_array = new_ai_array
+        else:
+            # if [player_arr] is empty
+            # init randomly (uniform) [cohorte_count] x [cohorte_size] AI
+            # else
+            # keep the [cohorte_count] best
+            # for each generate [cohorte_size - 1] new AI that use the parent weight with random update in the range +/-[update_pct_range]%
+            ai_array = [ia.IA(i) for i in range(learner_count)]
         # give each AI a player
-        player_arr = [generate_player() for _ in range(learner_count)]
-        # reset game state
+        player_arr = [generate_player() for _ in range(len(ai_array))]
         playable = True
 
     if playable:
@@ -209,13 +110,15 @@ while running:
             player.update(dt)
 
         for obstacle in obstacles:
-            obstacle.update(dt)
+            obstacle.update(dt, screen)
             for i, player in enumerate(player_arr):
-                if player.collide(obstacle):
+                if player.collide(obstacle, screen):
                     player.canPlay = False
                     #print(f"Player({i}): {player.score}")
 
         if all(not player.canPlay for player in player_arr):
+            # Find the 10 players that have the hightest score
+            # Generate the 9 from the top 10
             playable = False
             obstacles = [
                 Obstacle(sheet["rock.png"], pygame.Vector2(screen.get_width() + sheet["rock.png"].get_width(), screen.get_height() - sheet["rock.png"].get_height())),
