@@ -4,9 +4,9 @@ def sigmoid(value):
     return 1 / (1 + np.exp(-value))
 
 class IA:
-    def __init__(self, internal_id, weights = np.random.uniform(low=-1.0, high=1.0, size=2)):
+    def __init__(self, internal_id):
         self.id = internal_id
-        self.weights = weights
+        self.weights = np.random.uniform(low=-1.0, high=1.0, size=2)
         self.bias = 0.0
 
     @classmethod
