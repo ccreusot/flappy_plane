@@ -73,17 +73,12 @@ class Player:
             collision_radius * 2
         )
         
-        # Create a rect for the obstacle
-        obstacle_rect = pygame.Rect(
-            obstacle.position.x + obstacle.sprite.get_width() / 2, 
-            obstacle.position.y, 
-            obstacle.sprite.get_width() / 4, 
-            obstacle.sprite.get_height()
-        )
-
-        # pygame.draw.rect(screen, (255, 0, 0), obstacle_rect)
+        # Get the obstacle rects
+        top_rect = obstacle.get_top_rect()
+        bottom_rect = obstacle.get_bottom_rect()
         
-        # Check for collision
-        return player_rect.colliderect(obstacle_rect)\
-        or self.position.y < 0\
-        or self.position.y > screen.get_height() - 100
+        # Check for collision with either obstacle or screen boundaries
+        return (player_rect.colliderect(top_rect) or 
+                player_rect.colliderect(bottom_rect) or
+                self.position.y < 0 or
+                self.position.y > screen.get_height() - 100)

@@ -45,12 +45,17 @@ background = ScrollingImage(sheet["background.png"], 100, pygame.Vector2(0, 0), 
 ground = ScrollingImage(sheet["groundDirt.png"], 60, pygame.Vector2(0, screen.get_height() - sheet["groundDirt.png"].get_height()))
 # player = Player([planes["planeBlue1.png"], planes["planeBlue2.png"], planes["planeBlue3.png"]], pygame.Vector2(screen.get_width() / 2 - planes["planeBlue1.png"].get_width() / 2, screen.get_height() / 2 - planes["planeBlue1.png"].get_height() / 2))
 obstacles = [
-    Obstacle(sheet["rock.png"], pygame.Vector2(screen.get_width() + sheet["rock.png"].get_width(), screen.get_height() - sheet["rock.png"].get_height())),
-    Obstacle(sheet["rockDown.png"], pygame.Vector2(screen.get_width() + sheet["rockDown.png"].get_width(), 0))
-    ]
+    Obstacle(
+        sheet["rockDown.png"],  # Top obstacle (hanging from top)
+        sheet["rock.png"],      # Bottom obstacle (standing from bottom)
+        pygame.Vector2(screen.get_width() + sheet["rock.png"].get_width(), screen.get_height() // 2),
+        gap_size=random.randint(150, 250)  # Random gap size between 150 and 250
+    )
+]
 
 # idk, some name
 learner_count = 100
+additional_learner_count = 10
 
 # cohorte_count
 # cohorte_size
@@ -63,6 +68,16 @@ player_arr = []
 def generate_player():
     return Player([planes["planeBlue1.png"], planes["planeBlue2.png"], planes["planeBlue3.png"]], pygame.Vector2(screen.get_width() / 2 - planes["planeBlue1.png"].get_width() / 2, screen.get_height() / 2 - planes["planeBlue1.png"].get_height() / 2))    
 
+def generate_ai(id):
+    new_ai = ia.IA(id)
+    new_ai.id = id
+    return new_ai
+
+def generate_ai_from_parent(parent_ai, id):
+    new_ai = ia.IA.from_ia(parent_ai)
+    new_ai.id = id
+    return new_ai
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -73,15 +88,17 @@ while running:
             ai_array.sort(key=lambda ai: player_arr[ai.id].score, reverse=True)
             new_ai_array = []
             ai_count = 0
-            for ai in ai_array[:10]:
+            score = player_arr[ai_array[0].id].score
+            for ai in ai_array[:9]:
                 ai.id = ai_count
                 new_ai_array.append(ai)
                 ai_count += 1
                 for i in range(9):
-                    new_ai = ia.IA.from_ia(ai)
-                    new_ai.id = ai_count
-                    new_ai_array.append(new_ai)
+                    new_ai_array.append(generate_ai_from_parent(ai, ai_count))
                     ai_count += 1
+            for i in range(additional_learner_count):
+                new_ai_array.append(generate_ai(ai_count))
+                ai_count += 1
             ai_array = new_ai_array
         else:
             # if [player_arr] is empty
@@ -99,10 +116,12 @@ while running:
 
         for i, bot in enumerate(ai_array):
             linked_player = player_arr[i]
-            pipe_hole = pygame.Vector2(obstacles[0].position.x, obstacles[0].position.y + obstacles[0].sprite.get_height())
+            pipe_hole = obstacles[0].get_gap_center()
+            pike_top = obstacles[0].get_pike_position_top()
+            pike_bottom = obstacles[0].get_pike_position_bottom()
             pipe_distance = linked_player.position.distance_to(pipe_hole)
-            if bot.should_flap(linked_player.position.y, pipe_distance):
-                linked_player.move_up()
+            if bot.should_flap(linked_player.position.y, pipe_hole.x, pike_top, pike_bottom):
+                    linked_player.move_up()
 
         background.update(dt)
         ground.update(dt)
@@ -121,8 +140,12 @@ while running:
             # Generate the 9 from the top 10
             playable = False
             obstacles = [
-                Obstacle(sheet["rock.png"], pygame.Vector2(screen.get_width() + sheet["rock.png"].get_width(), screen.get_height() - sheet["rock.png"].get_height())),
-                Obstacle(sheet["rockDown.png"], pygame.Vector2(screen.get_width() + sheet["rockDown.png"].get_width(), 0))
+                Obstacle(
+                    sheet["rockDown.png"],  # Top obstacle (hanging from top)
+                    sheet["rock.png"],      # Bottom obstacle (standing from bottom)
+                    pygame.Vector2(screen.get_width() + sheet["rock.png"].get_width(), screen.get_height() // 2),
+                    gap_size=random.randint(150, 250)  # Random gap size between 150 and 250
+                )
             ]
             continue
 
@@ -144,6 +167,12 @@ while running:
     # Display score centered on top of the screen
     score_text = pygame.font.SysFont("Arial", 42).render(f"{score}", True, (0, 0, 0))
     screen.blit(score_text, (screen.get_width() // 2 - score_text.get_width() // 2, 10))
+    
+    # display alive count
+    current_generation = max(ai.generation for ai in ai_array if player_arr[ai.id].canPlay)
+    alive_count = sum(player.canPlay for player in player_arr)
+    alive_text = pygame.font.SysFont("Arial", 38).render(f"{alive_count} / {current_generation}", True, (0, 0, 0))
+    screen.blit(alive_text, (screen.get_width() // 2 - alive_text.get_width() // 2, screen.get_height() - 50))
 
     pygame.display.flip()
     dt = clock.tick(60) / 1000
